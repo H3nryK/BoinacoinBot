@@ -199,7 +199,7 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 def main() -> None:
     # Replace 'YOUR_BOT_TOKEN' with your actual Bot Token
-    application = ApplicationBuilder().token("7081096666:AAEaMFK_CoBpHop9s_IBcQX-qrB8jTS6daY").build()
+    application = ApplicationBuilder().token("YOUR_BOT_TOKEN").build()
 
     job_queue = JobQueue()
     job_queue.set_application(application)
