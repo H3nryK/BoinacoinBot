@@ -38,7 +38,7 @@ This Telegram bot is designed to provide information and manage a Telegram group
    cd BoinacoinBot
 3. Install the required dependencies
    ```bash
-   pip install logging "python-telegram-bot[job-queue]" python-telegram-bot
+   pip install "python-telegram-bot[job-queue]" python-telegram-bot
 4. Obtain a Telegram Bot Token from the BotFather on Telegram.
 5. Update the __'YOUR_BOT_TOKEN'__ placeholder in the script with your actual Bot Token.
 6. Customize the script as needed, adding additional functionality or modifying existing features.
