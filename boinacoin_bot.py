@@ -1,15 +1,14 @@
 import logging
-from telegram import Update, Poll, PollAnswer, ChatPermissions
+import asyncio
+from telegram import Update
+from telegram.constants import ChatAction
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler, PollAnswerHandler, 
-    ContextTypes, filters, ChatMemberHandler, JobQueue, CallbackContext
+    ContextTypes, filters, JobQueue, CallbackContext
 )
-from datetime import time
-from telegram.constants import ParseMode
-from flask import Flask, request, jsonify
-
-app = Flask(__name__)
-application = app
+from datetime import datetime
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 # Enable logging
 logging.basicConfig(
@@ -20,9 +19,23 @@ logger = logging.getLogger(__name__)
 # Dummy database for subscriptions
 subscribers = []
 
+# Define your bot token here
+TOKEN = ""
+
+# Define your start message
+START_MESSAGE = "Hey buddy, what do you want to order today?"
+
+# Define your welcome message
+WELCOME_MESSAGE = "Welcome to BoinaCoin! We're glad you joined us. Remember to follow us on X for more updates: https://x.com/BoinaCoin"
+
 # Define the command handlers
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text('Hello! I am Boinacoin Bot. How can I assist you today? Type /help for the list of commands.')
+async def start(update: Update, context: CallbackContext) -> None:
+    await update.message.reply_text(START_MESSAGE)
+
+# Function to handle new members joining
+async def welcome_new_member(update: Update, context: CallbackContext) -> None:
+    new_member = update.message.new_chat_members[0]
+    await update.message.reply_text(f"Hey {new_member.first_name}! {WELCOME_MESSAGE}")
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
@@ -43,7 +56,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         '/borkbork - 1 boinacoin = 1 boinacoin\n'
         "/pizzatime - It's pizza time!\n"
         '/buythedig - boinacoin to the moon!\n'
-        "/fomo - Don't let FOMO get you\n"
         '/shitcoin - boinacoin is no shitcoin\n'
     )
 
@@ -77,13 +89,6 @@ async def unsubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         await update.message.reply_text('You have been unsubscribed from updates.')
     else:
         await update.message.reply_text('You are not subscribed.')
-
-async def send_update(context: ContextTypes.DEFAULT_TYPE) -> None:
-    for subscriber_id in subscribers:
-        try:
-            await context.bot.send_message(chat_id=subscriber_id, text='Here is your regular update from Boinacoin!')
-        except Exception as e:
-            logger.error(f"Error sending update to {subscriber_id}: {e}")
 
 async def announce(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message.chat.type != 'private':
@@ -120,51 +125,9 @@ async def handle_poll_answer(update: Update, context: ContextTypes.DEFAULT_TYPE)
     poll_id = answer.poll_id
     option_ids = answer.option_ids
     logger.info(f"User {user} answered poll {poll_id} with options {option_ids}")
-        
-# Define the daily post function
-async def daily_post(context: CallbackContext) -> None:
-    chat_id = -1002005569292  # Replace with your group chat ID
-    message = (
-        "Follow us on our socials for the latest updates:\n"
-        "Twitter: https://twitter.com/boinacoin\n"
-        "Instagram: https://instagram.com/boinacoin"
-    )
-    image_path = 'media/logo.png'
-    logger.info(f"Attempting to send daily post to chat ID {chat_id}")
 
-    if os.path.exists(image_path):
-        try:
-            await context.bot.send_photo(
-                chat_id=chat_id,
-                photo=open(image_path, 'rb'),
-                caption=message,
-                parse_mode=ParseMode.HTML
-            )
-            logger.info("Daily post sent successfully.")
-        except Exception as e:
-            logger.error(f"Error sending daily post: {e}")
-    else:
-        logger.error(f"Image not found at {image_path}")
-
-
-# Group management handlers
-async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    for member in update.message.new_chat_members:
-        await update.message.reply_text(f"Welcome {member.full_name} to the Boinacoin group!")
-
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # Here you can add custom message handling logic
-    text = update.message.text.lower()
-    if "spam" in text:
-        await update.message.reply_text("Please refrain from spamming the group.")
-        await context.bot.restrict_chat_member(
-            chat_id=update.message.chat_id,
-            user_id=update.message.from_user.id,
-            permissions=ChatPermissions(can_send_messages=False),
-            until_date=None  # Ban indefinitely
-        )
-        
 async def tendies(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.UPLOAD_PHOTO)
     await context.bot.send_animation(chat_id=update.effective_chat.id, animation=open('media/chicken.gif', 'rb'))
     await update.message.reply_text("Gains incoming! 🚀💰")
 
@@ -172,37 +135,63 @@ async def gainz(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("💪 HODL for massive boinacoin gainz!")
 
 async def mcnugget(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.UPLOAD_PHOTO)
     await context.bot.send_photo(chat_id=update.effective_chat.id, photo=open('media/Doge_meme.jpg', 'rb'))
     await update.message.reply_text("Wow much nugget, so crypto")
 
 async def borkbork(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.UPLOAD_PHOTO)
     await context.bot.send_animation(chat_id=update.effective_chat.id, animation=open('media/funny.gif', 'rb'))
     await update.message.reply_text("1 boinacoin = 1 boinacoin")
 
 async def pizzatime(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.UPLOAD_PHOTO)
     await context.bot.send_photo(chat_id=update.effective_chat.id, photo=open('media/pizza.jpg', 'rb'))
 
 async def buythedig(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.UPLOAD_PHOTO)
     await context.bot.send_photo(chat_id=update.effective_chat.id, photo=open('media/astronaut.jpg', 'rb'))
     await update.message.reply_text("You guys are buying fiat? No no, boinacoin to the moon! 🚀")
 
-async def fomo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await context.bot.send_animation(chat_id=update.effective_chat.id, animation=open('meida/miss.gif', 'rb'))
-    await update.message.reply_text("Don't let FOMO get you, stack boinacoin now!")
-
 async def shitcoin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.UPLOAD_PHOTO)
     await context.bot.send_photo(chat_id=update.effective_chat.id, photo=open('media/kermit.jpg', 'rb'))
     await update.message.reply_text("boinacoin is no shitcoin, it's the dankest crypto out there")
+
+# Function to send frequent messages
+# In the send_frequent_message function
+async def send_frequent_message(context: CallbackContext) -> None:
+    message = "Hey everyone! How's your day going?\nDon't forget to follow our X community to stay updated.You might get the juice. Tell a friend to tell a friend.\n\n https://x.com/BoinaCoin"
+    chat_id = # Replace with your group chat ID
+    try:
+        await context.bot.send_message(chat_id=chat_id, text=message)
+    except Exception as e:
+        logger.error(f"Error sending frequent message: {e}")
+
+# Function to send frequent updates
+async def send_frequent_update(context: CallbackContext) -> None:
+    message = ("Hey BoinaCoin fam! 🚀 \nJust a reminder that every dip is an opportunity "
+               "for a comeback! Keep hodling strong and remember, the journey to the moon "
+               "is full of twists and turns, but together, we'll reach our destination. "
+               "Let's spread positivity, support each other, and keep the BoinaCoin spirit alive! "
+               "\n💪💎 #BoinaFam #ToTheMoon")
+    chat_id =  # Replace with your group chat ID
+    try:
+        await context.bot.send_message(chat_id=chat_id, text=message)
+    except Exception as e:
+        logger.error(f"Error sending frequent message: {e}")
 
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(update.message.text)
 
 def main() -> None:
     # Replace 'YOUR_BOT_TOKEN' with your actual Bot Token
-    application = ApplicationBuilder().token("YOUR_BOT_TOKEN").build()
+    application = ApplicationBuilder().token(TOKEN).build()
 
-    job_queue = JobQueue()
-    job_queue.set_application(application)
+    job_queue = application.job_queue
+
+    # Create an APScheduler scheduler
+    scheduler = AsyncIOScheduler()
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
@@ -213,45 +202,29 @@ def main() -> None:
     application.add_handler(CommandHandler("tokenomics", tokenomics))
     application.add_handler(CommandHandler("subscribe", subscribe))
     application.add_handler(CommandHandler("unsubscribe", unsubscribe))
-    application.add_handler(CommandHandler("poll", poll))
     application.add_handler(CommandHandler("announce", announce))
+    application.add_handler(CommandHandler("poll", poll))
+    application.add_handler(PollAnswerHandler(handle_poll_answer))
     application.add_handler(CommandHandler("tendies", tendies))
     application.add_handler(CommandHandler("gainz", gainz))
     application.add_handler(CommandHandler("mcnugget", mcnugget))
     application.add_handler(CommandHandler("borkbork", borkbork))
     application.add_handler(CommandHandler("pizzatime", pizzatime))
     application.add_handler(CommandHandler("buythedig", buythedig))
-    application.add_handler(CommandHandler("fomo", fomo))
     application.add_handler(CommandHandler("shitcoin", shitcoin))
-    application.add_handler(PollAnswerHandler(handle_poll_answer))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    application.add_handler(ChatMemberHandler(welcome_new_member, ChatMemberHandler.MY_CHAT_MEMBER))
-    application.add_handler(ChatMemberHandler(welcome_new_member, ChatMemberHandler.CHAT_MEMBER))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+    application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_new_member))
 
+    # Scheduling the frequent message
+    job = job_queue.run_repeating(send_frequent_message, interval=14400, first=3600)
 
-    # Schedule a daily update for subscribers
-    job_queue.run_daily(send_update, time=time(11, 0, 0)) 
-    
-    job_queue.run_daily(daily_post, time=time(9, 0, 0))   
-    job_queue.run_daily(daily_post, time=time(10, 57, 0))  
-    job_queue.run_daily(daily_post, time=time(21, 0, 0)) 
-    logger.info("Job queue set up for daily posts at 9 AM, 11 AM, and 7 PM.")
+    # Scheduling the frequent update
+    job = job_queue.run_repeating(send_frequent_message, interval=86400, first=57600)
 
-    # Start the JobQueue
-    job_queue.start()
+    # Start the scheduler
+    scheduler.start()
 
     application.run_polling()
-    
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    update = Update.de_json(request.json, bot)
-    dispatcher.process_update(update)
-    return jsonify({'status': 'ok'})
 
-def run_bot():
-    global bot, dispatcher
-    bot, dispatcher = main()
-    app.run(host='0.0.0.0', port=5000)
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
