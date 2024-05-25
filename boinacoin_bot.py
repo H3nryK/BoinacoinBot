@@ -214,11 +214,11 @@ def main() -> None:
     application.add_handler(CommandHandler("shitcoin", shitcoin))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
     application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_new_member))
+    
+    # Scheduling the frequent message on a 24hr loop
+    job = job_queue.run_repeating(send_frequent_message, interval=86400, first=66600)
 
-    # Scheduling the frequent message
-    job = job_queue.run_repeating(send_frequent_message, interval=14400, first=3600)
-
-    # Scheduling the frequent update
+    # Scheduling the frequent update on a 24hr loop
     job = job_queue.run_repeating(send_frequent_message, interval=86400, first=57600)
 
     # Start the scheduler
