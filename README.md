@@ -45,6 +45,10 @@ This Telegram bot is designed to provide information and manage a Telegram group
 7. Run the script using your Python environment.
    ```bash
    python boinacoin_bot.py
+
+## Enhancements
+
+A telegram bot for token airdrop.
    
 ## Contribution
 
