@@ -24,6 +24,15 @@ user_data = {
     'balances': {}
 }
 
+def verify_telegram_membership(telegram_username: str, group_id: str) -> bool:
+    try:
+        # Replace 'your_telegram_group_id' with your actual Telegram group ID
+        chat_member = bot.get_chat_member(group_id, telegram_username)
+        return chat_member.status in ['member', 'administrator', 'creator']
+    except Exception as e:
+        logger.error(f"Error verifying Telegram membership: {e}")
+        return False
+
 async def start(update: Update, context: CallbackContext) -> None:
     await update.message.reply_text(
         'Welcome to Boinacoin! Use /tasks to see available tasks, '
